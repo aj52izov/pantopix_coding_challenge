@@ -51,5 +51,3 @@ Thumbs.db
 .vscode/settings.json
 pantopix_rag_chatbot_postgres_data/
 pantopix_rag_chatbot_ollama/
-frontend
-frontend/

@@ -6,7 +6,7 @@ from utils.logger import Logger
 class Ollama:
     def __init__(self, 
                  ollama_host_url: str = get_ollama_url(), 
-                 model: str = "gemma3:12b"):
+                 model: str = "gemma3:4b"):
         """Initialize the Ollama client.
         
         Args:
@@ -31,6 +31,7 @@ class Ollama:
             bool: True if the model is loaded successfully, False otherwise.
         """
         try:
+            await self.ollama_client.pull(self.model)
             result = await self.ollama_client.generate(
                 model=self.model,
                 keep_alive=-1

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Ebene_1" data-name="Ebene 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 50 50">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-2 {
+        fill: url(#Unbenannter_Verlauf_55);
+      }
+    </style>
+    <radialGradient id="Unbenannter_Verlauf_55" data-name="Unbenannter Verlauf 55" cx="55.82" cy="52.9" fx="55.82" fy="52.9" r="122.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f05a28"/>
+      <stop offset=".97" stop-color="#ec8d6d"/>
+    </radialGradient>
+  </defs>
+  <rect class="cls-2" x="0" width="50" height="50"/>
+  <path class="cls-1" d="M42.69,8.26c-.64-.64-1.45-.95-2.4-.95H9.69c-.95,0-1.74.31-2.38.95s-.95,1.43-.95,2.4v32.03l6.38-6.38h27.55c.95,0,1.76-.31,2.4-.95s.95-1.45.95-2.4V10.67c0-.97-.31-1.76-.95-2.4ZM41.57,32.96c0,.33-.12.62-.39.89s-.56.39-.89.39H12.64c-.51,0-1,.2-1.36.56l-2.85,2.84V10.67c0-.33.12-.62.39-.89.27-.27.56-.39.87-.39h30.6c.33,0,.62.12.89.39.27.27.39.56.39.89v22.29Z"/>
+  <rect class="cls-1" x="12.22" y="27.23" width="16.26" height="2.32" rx="1.16" ry="1.16"/>
+  <rect class="cls-1" x="12.22" y="20.26" width="25.56" height="2.32" rx="1.16" ry="1.16"/>
+  <rect class="cls-1" x="12.22" y="13.29" width="25.56" height="2.32" rx="1.16" ry="1.16"/>
+</svg>
