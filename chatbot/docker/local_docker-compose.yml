@@ -1,10 +1,49 @@
-version: '3.9'
-
 networks:
   pantopix_rag_chatbot_network:
     name: pantopix_rag_chatbot_network
   
 services:
+  # ollama service
+  ollama:
+    image: ollama/ollama:latest
+    networks:
+      - pantopix_rag_chatbot_network
+    volumes:
+      - ollama:/root/.ollama 
+    ports:
+      - "11435:11434"
+  # postgres service
+  postgres:
+    image: bitnami/postgresql:latest
+    networks:
+      - pantopix_rag_chatbot_network
+    volumes:
+      - pgdata:/bitnami/postgresql
+    environment:
+      - POSTGRESQL_USERNAME=rag_postgres
+      - POSTGRESQL_PASSWORD=rag_postgres_password
+      - POSTGRESQL_DATABASE=postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U rag_postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  backend:
+    image: pantopix_rag_chatbot_backend:latest
+    networks:
+      - pantopix_rag_chatbot_network
+    depends_on:
+      ollama:
+        condition: service_started
+      postgres:
+          condition: service_healthy
+
+  frontend:
+    image: pantopix_rag_chatbot_frontend:latest
+    networks:
+      - pantopix_rag_chatbot_network
   chatbot-proxy:
     image: pantopix_rag_chatbot_nginx:latest
     networks:
@@ -15,33 +54,7 @@ services:
       - frontend
       - backend
     command: [ nginx-debug, '-g', 'daemon off;' ]
-  backend:
-    image: pantopix_rag_chatbot_backend:latest
-    networks:
-      - pantopix_rag_chatbot_network
-  frontend:
-    image: pantopix_rag_chatbot_frontend:latest
-    networks:
-      - pantopix_rag_chatbot_network
-  # ollama service
+
+volumes:
+  pgdata:
   ollama:
-    image: ollama/ollama:latest
-    networks:
-      - pantopix_rag_chatbot_network
-    volumes:
-      - ./pantopix_rag_chatbot_ollama:/root/.ollama 
-    ports:
-      - "11434:11434"
-  # postgres service
-  postgres:
-    image: bitnami/postgresql:latest
-    networks:
-      - pantopix_rag_chatbot_network
-    volumes:
-      - ./pantopix_rag_chatbot_postgres_data:/bitnami/postgresql
-    environment:
-      - POSTGRESQL_USERNAME=rag_postgres
-      - POSTGRESQL_PASSWORD=rag_postgres_password
-      - POSTGRESQL_DATABASE=postgres
-    ports:
-      - "5432:5432"

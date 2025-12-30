@@ -1,5 +1,4 @@
 import traceback
-import logging
 from sqlalchemy import Table, Column, JSON, TIMESTAMP, MetaData, func, String, inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -7,9 +6,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, ProgrammingError
 from utils.config import get_db_host, get_db_name, get_db_password, get_db_port, get_db_username, get_schema_name, get_table_name
 
-# Set up logging configuration
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure logging
+from utils.logger import Logger
+# Set up logging to track application behavior
+logger = Logger(__name__)
 
 class DatabaseInteraction:
     """DatabaseInteraction handles asynchronous database operations."""
@@ -20,7 +20,7 @@ class DatabaseInteraction:
                  schema = get_schema_name(), 
                  port: int = get_db_port(), 
                  db_name: str = get_db_name(), 
-                 table_name: str = get_table_name(envKey="CHATBOT_LOG"),
+                 table_name: str = get_table_name("CHATBOT_LOG"),
                  columns_dict: dict = {
                      "id": {"type": String, "primary_key": True}, 
                      "data": {"type": JSON}, 
@@ -33,10 +33,7 @@ class DatabaseInteraction:
                  pool_recycle=1800,
                  pool_pre_ping=True):
         # Construct the database URL
-        if port:
-            self.__database_url = f'postgresql+asyncpg://{username}:{password}@{host}:{port}/{db_name}'
-        else:
-            self.__database_url = f'postgresql+asyncpg://{username}:{password}@{host}/{db_name}'
+        self.__database_url = f'postgresql+asyncpg://{username}:{password}@{host}:{port}/{db_name}'
         
         # Create an asynchronous SQLAlchemy engine
         self.__engine = create_async_engine(

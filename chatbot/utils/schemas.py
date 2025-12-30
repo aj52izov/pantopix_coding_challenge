@@ -1,10 +1,10 @@
-import logging
 from pydantic import BaseModel, Field
 from typing import Optional
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure logging
+from utils.logger import Logger
+# Set up logging to track application behavior
+logger = Logger(__name__)
 
 class Meta(BaseModel):
     """
@@ -23,13 +23,21 @@ class Meta(BaseModel):
         description="True if this is the last message of the chat session."
     )
 
+class Data(BaseModel):
+    """
+    data field structure for chat session. Represents the final prompt used.
+    """
+    timestamp: str = Field(..., description="ISO formatted timestamp of the message.")
+    user_message: str = Field(..., description="The user's message content.")
+    final_prompt: str = Field(...,description="The final prompt sent to the bot, if applicable.")
+    
 class ChatResponse(BaseModel):
     """
     Response structure from the chat bot.
     """
     meta: Meta = Field(..., description="Metadata about current chat status.")
     message: str = Field(..., description="The bot's reply to the user.")
-    data: str = Field(..., description="Serialized data or session data for this chat.")
+    data: list[Data] = Field(..., description="Data related to the chat session.")
     id: str = Field(..., description="Unique chat session identifier.")
 
 def get_create_chat_response_desc():

@@ -1,9 +1,7 @@
 import ast
 from ollama import AsyncClient
-from faker import Faker
 from utils.config import get_ollama_url
-
-fake = Faker(locale="de_DE")
+from utils.logger import Logger
 
 class Ollama:
     def __init__(self, 
@@ -17,6 +15,7 @@ class Ollama:
         """
         self.ollama_client = AsyncClient(host=ollama_host_url, verify=False)
         self.model = model
+        self.logger = Logger(__name__)
 
     async def shutdown(self):
         """Unload the model and clean up resources."""
@@ -36,9 +35,10 @@ class Ollama:
                 model=self.model,
                 keep_alive=-1
             )
+            self.logger.info(f"Model {self.model} loaded successfully.")
             return result.get("done", False)
         except Exception as e:
-            print(f"Error loading model {self.model}: {e}")
+            self.logger.error(f"Error loading model {self.model}: {e}")
             return False
 
     async def unload_model(self) -> bool:
@@ -52,9 +52,10 @@ class Ollama:
                 model=self.model,
                 keep_alive=0
             )
+            self.logger.info(f"Model {self.model} unloaded successfully.")
             return result.get("done", False)
         except Exception as e:
-            print(f"Error unloading model {self.model}: {e}")
+            self.logger.error(f"Error unloading model {self.model}: {e}")
             return False
 
     async def generate_response(
@@ -89,7 +90,7 @@ class Ollama:
                 response = ast.literal_eval(response)
             return response
         except Exception as e:
-            print(f"Error generating response for prompt '{prompt}': {e}")
+            self.logger.error(f"Error generating response for prompt '{prompt}': {e}")
             return None
 
     async def extract_user_language(self, message: str) -> str:

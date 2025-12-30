@@ -2,11 +2,10 @@ import asyncio
 from datetime import datetime
 import os
 from dotenv import dotenv_values
-import logging
+from utils.logger import Logger
 
 # Set up logging to track application behavior
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = Logger(__name__)
 
 # Set up environment configuration and paths
 _module_path = os.path.dirname(os.path.abspath(__file__))
@@ -170,7 +169,7 @@ async def continue_chat(
             prompt_history.append({
                 "timestamp": datetime.now().isoformat(),
                 "user_message": message,
-                "final_prompt": f"Prompt--{len(payload['conversation']) - 2}",
+                "final_prompt": f"Prompt-{len(payload['conversation']) - 2}",
             })
         else:
             raise HTTPException(
