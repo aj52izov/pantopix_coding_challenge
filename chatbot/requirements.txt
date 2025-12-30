@@ -1,0 +1,13 @@
+scipy==1.12
+python-dotenv
+sqlalchemy
+requests
+colorist
+fastapi
+unicorn 
+pydantic
+psycopg2-binary
+uvicorn
+asyncpg
+ollama
+colorist

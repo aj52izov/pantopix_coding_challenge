@@ -1,0 +1,47 @@
+version: '3.9'
+
+networks:
+  pantopix_rag_chatbot_network:
+    name: pantopix_rag_chatbot_network
+  
+services:
+  chatbot-proxy:
+    image: pantopix_rag_chatbot_nginx:latest
+    networks:
+      - pantopix_rag_chatbot_network
+    ports:
+      - "8083:80"
+    depends_on:
+      - frontend
+      - backend
+    command: [ nginx-debug, '-g', 'daemon off;' ]
+  backend:
+    image: pantopix_rag_chatbot_backend:latest
+    networks:
+      - pantopix_rag_chatbot_network
+  frontend:
+    image: pantopix_rag_chatbot_frontend:latest
+    networks:
+      - pantopix_rag_chatbot_network
+  # ollama service
+  ollama:
+    image: ollama/ollama:latest
+    networks:
+      - pantopix_rag_chatbot_network
+    volumes:
+      - ./pantopix_rag_chatbot_ollama:/root/.ollama 
+    ports:
+      - "11434:11434"
+  # postgres service
+  postgres:
+    image: bitnami/postgresql:latest
+    networks:
+      - pantopix_rag_chatbot_network
+    volumes:
+      - ./pantopix_rag_chatbot_postgres_data:/bitnami/postgresql
+    environment:
+      - POSTGRESQL_USERNAME=rag_postgres
+      - POSTGRESQL_PASSWORD=rag_postgres_password
+      - POSTGRESQL_DATABASE=postgres
+    ports:
+      - "5432:5432"
