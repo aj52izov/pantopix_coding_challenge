@@ -1,9 +1,11 @@
 import logging
 
 class AnsiColorFormatter(logging.Formatter):
+    def __init__(self, fmt, style='{'):
+        super().__init__(fmt, style=style)
     def format(self, record: logging.LogRecord):
         no_style = '\033[0m'
-        bold = '\033[91m'
+        bold = '\033[1m'
         grey = '\033[90m'
         yellow = '\033[93m'
         red = '\033[31m'
@@ -22,11 +24,13 @@ class Logger:
     """Logger class to handle logging with timestamps and colored output."""
     def __init__(self, name: str = __name__):
         self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
         self.timestamp_format = "%Y-%m-%d %H:%M:%S"
         handler = logging.StreamHandler()
         formatter = AnsiColorFormatter('{asctime} | {levelname:<8s} | {name:<20s} | {message}', style='{')
         handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        if not self.logger.hasHandlers():
+            self.logger.addHandler(handler)
         
     def error(self, message: str):
         self.logger.error(f"{message}")

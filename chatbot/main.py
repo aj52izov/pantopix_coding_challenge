@@ -1,11 +1,10 @@
-import asyncio
 from datetime import datetime
 import os
 from dotenv import dotenv_values
 from utils.logger import Logger
 
 # Set up logging to track application behavior
-logger = Logger(__name__)
+logger = Logger("main")
 
 # Set up environment configuration and paths
 _module_path = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +20,7 @@ from utils.databaseUtils import DatabaseInteraction
 from fastapi.middleware.cors import CORSMiddleware
 from utils import schemas as chat_schemas
 from utils.chatbot_utils import generate_chat_id, form_result
+from utils.sparql_utils import WikidataClient
 
 # Constants
 HISTORY_LENGTH = 60
@@ -33,6 +33,7 @@ log_database_interaction = DatabaseInteraction(
 
 # Initialize Ollama API for interacting with AI models
 ollama_api = Ollama()
+wikidataClient = WikidataClient(user_agent="MyWikidataClient/1.0 (contact: you@example.com)")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -95,7 +96,7 @@ async def new_chat(response: Response = None):
     payload = {
         "conversation": [{
             "role": "user",
-            "content": [{"type": "input_text", "text": "Let's start"}]
+            "message": "Let's start"
         }]
     }
     
@@ -162,14 +163,35 @@ async def continue_chat(
         message = str(payload.get("message", "")).strip().lower()
 
         if message:
-            message = message.replace("  ", " ")[:1000]  # Clean and limit the message length
-            
+            message = message.replace("  ", " ")[:1000]  # Clean and limit the message length            
             # Append user message to the conversation
-            payload["conversation"].append({"role": "user", "content": [{"type": "input_text", "text": message}]})
+            payload["conversation"].append({"role": "user", "message": message})
+            extracted_info = await ollama_api.extract_user_info(payload["conversation"][2:][-3:])
+            logger.info(f"Extracted info for querying Wikidata: {extracted_info}")
+            if extracted_info.get("ask_clarification", False):
+                return await form_result(
+                    result_message=extracted_info.get("clarification_question", "Could you please clarify your question?"),
+                    chat_id=chat_id,
+                    data=prompt_history,
+                    payload=payload,
+                    log_database_interaction=log_database_interaction
+                )
+            entity_data, wiki_answer = await wikidataClient.get_coach_of_team(
+                entity_text=extracted_info.get("entity_text"), 
+                property_text=extracted_info.get("property_text", "head coach"),
+                language=extracted_info.get("language", "en"), 
+                year=extracted_info.get("year", None)
+                )
+            result_message, final_prompt = await ollama_api.generate_answer(
+                question=payload["conversation"][2:][-3:],
+                entity_data=entity_data,
+                wiki_answer=wiki_answer,
+                language=extracted_info.get("language", "en")
+            )            
             prompt_history.append({
                 "timestamp": datetime.now().isoformat(),
                 "user_message": message,
-                "final_prompt": f"Prompt-{len(payload['conversation']) - 2}",
+                "final_prompt": final_prompt,
             })
         else:
             raise HTTPException(
@@ -177,7 +199,6 @@ async def continue_chat(
                 detail="Missing required field: message",
             )
         
-        result_message = "result message"  # Replace with actual logic to get the result
         return await form_result(
             result_message=result_message,
             chat_id=chat_id,

@@ -122,7 +122,6 @@ class DatabaseInteraction:
                 insert_stmt = self.__table.insert().values(column_values)
                 await session.execute(insert_stmt)
                 await session.commit()
-                logger.info(f"Inserted data: {column_values}")
         except SQLAlchemyError as e:
             logger.error(f"SQLAlchemyError occurred during insertion: {e}")
             logger.error(traceback.format_exc())
@@ -139,7 +138,7 @@ class DatabaseInteraction:
                 update_stmt = self.__table.update().where(self.__table.c.id == id).values(column_values)
                 await session.execute(update_stmt)
                 await session.commit()
-                logger.info(f"Updated data for ID: {id} with values: {column_values}")
+                logger.info(f"Updated data for ID: {id}")
         except SQLAlchemyError as e:
             logger.error(f"SQLAlchemyError occurred during update: {e}")
             logger.error(traceback.format_exc())

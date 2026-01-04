@@ -48,7 +48,7 @@ async def form_result(
     payload["conversation"].append(
         {
             "role": "assistant",
-            "content": [{"type": "output_text", "text": str(result_message)}],
+            "message": str(result_message),
         }
     )
     

@@ -1,7 +1,9 @@
 import httpx
 from utils.logger import Logger
+from utils.wikidata_bio_fetcher import WikidataBioFetcher
 import re
 from datetime import datetime
+import traceback
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 WDQS_URL = "https://query.wikidata.org/sparql"
@@ -16,38 +18,87 @@ class WikidataClient:
         }
         self._timeout = timeout
         self.logger = Logger(__name__)
+        self._qid = None
+        self._pid = None
+        self.bio_fetcher = WikidataBioFetcher(user_agent=user_agent, timeout=timeout)
         
-    async def _search_(self, text: str, type:str, language: str = "en", limit: int = 5) -> list[dict]:
+    async def _search_(self, text: str, entity_type:str, language: str = "en", limit: int = 5) -> list[dict]:
         """
         Search on  Wikidata by text using wbsearchentities.
         Returns a list of candidates with fields like id, label, description.
         """
-        params = {
-            "action": "wbsearchentities",
-            "format": "json",
-            "search": text,
-            "language": language,
-            "limit": limit,
-            "type": type,
-        }                
-        async with httpx.AsyncClient(timeout=self._timeout, headers=self._headers) as client:
-            r = await client.get(WIKIDATA_API, params=params)
-            r.raise_for_status()
-            data = r.json()
-            return data.get("search", [])
+        try:
+            params = {
+                "action": "wbsearchentities",
+                "format": "json",
+                "search": text,
+                "language": language,
+                "languagefallback": 1,
+                "limit": limit,
+                "type": entity_type,
+            }                
+            async with httpx.AsyncClient(timeout=self._timeout, headers=self._headers) as client:
+                r = await client.get(WIKIDATA_API, params=params)
+                r.raise_for_status()
+                data = r.json()
+                return data.get("search", [])
+        except Exception:
+            self.logger.error(f"Error searching Wikidata for text '{text}': {traceback.format_exc()}")
+            return []
 
-    async def search_entity(self, text: str, language: str = "en", limit: int = 5) -> list[dict]:
+    async def search_entity(self, entity_text: str, language: str = "en", limit: int = 1) -> bool:
         """
         Search Wikidata items (Q-ids) by text using wbsearchentities.
-        Returns a list of candidates with fields like id, label, description.
+        
+        args:
+            entity_text: str - The text to search for.
+            language: str - Language code for search (default "en").
+            limit: int - Maximum number of results to return.
+        returns:
+            bool - True if an entity was found and stored, otherwise False.
         """
-        return await self._search_(text, type="item", language=language, limit=limit)
+        team_candidates =  await self._search_(entity_text, entity_type="item", language=language, limit=limit)
+        if not team_candidates:
+            self.logger.warning(f"Could not find the item {entity_text}")
+            return False
+        #print(f'Team candidates: {[(c["id"], c.get("label"), c.get("description")) for c in team_candidates]}')
+        qid = team_candidates[0]["id"] if team_candidates else None
+        self._qid = qid
+        return True
 
-    async def search_property(self, text: str, *, language: str = "en", limit: int = 10) -> list[dict]:
+    async def search_property(self, property_text: str="head coach", language: str = "en", limit: int = 1) -> bool:
         """
         Search Wikidata properties (P-ids) by text using wbsearchentities.
+        
+        args:
+            property_text: str - The text to search for.
+            language: str - Language code for search (default "en").
+            limit: int - Maximum number of results to return.
+        returns:
+            bool - True if a property was found and stored, otherwise False.
         """
-        return await self._search_(text, type="property", language=language, limit=limit)
+        prop_candidates = await self._search_(property_text, entity_type="property", language=language, limit=limit)
+        if not prop_candidates:
+            self.logger.warning(f"Could not find the property {property_text}")
+            return False
+        #print(f'Property candidates: {[(c["id"], c.get("label"), c.get("description")) for c in prop_candidates]}')
+        pid = prop_candidates[0]["id"] if prop_candidates else None
+        self._pid = pid
+        return True
+    
+    async def search_entity_and_property(self, entity_text: str, property_text: str="head coach", language: str = "en") -> bool:
+        """
+        Search both entity and property and store their Q-id and P-id.
+        args:
+            entity_text: str - The text to search for the entity.
+            property_text: str - The text to search for the property.
+            language: str - Language code for search (default "en").
+        returns:
+            bool - True if both entity and property were found, otherwise False.
+        """
+        do_e_exist =  await self.search_entity(entity_text, language=language)
+        do_p_exist = await self.search_property(property_text, language=language)
+        return do_e_exist and do_p_exist
 
     async def wdqs_post(self, query: str) -> dict:
         """
@@ -62,7 +113,11 @@ class WikidataClient:
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             r = await client.post(WDQS_URL, headers=headers, data=data)
-            r.raise_for_status()
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                self.logger.error(f"WDQS error: {e.response.status_code}\nQuery:\n{query}\nResponse:\n{e.response.text}")
+                raise
             return r.json()
         
     def _ensure_qid(self, qid: str) -> str:
@@ -139,7 +194,7 @@ class WikidataClient:
                 PREFIX wikibase: <http://wikiba.se/ontology#>
                 PREFIX bd: <http://www.bigdata.com/rdf#>
 
-                SELECT * WHERE {{
+                SELECT ?value ?valueLabel ?start ?end WHERE {{
                 wd:{team_qid} p:{prop_pid} ?st .
                 ?st ps:{prop_pid} ?value .
 
@@ -152,82 +207,58 @@ class WikidataClient:
                 FILTER(!BOUND(?start) || ?start <= ?yearEnd)
                 FILTER(!BOUND(?end)   || ?end   >= ?yearStart)
 
-                SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language}". }}
+                SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
                 }}
                 ORDER BY DESC(?start)
                 LIMIT 1
                 """.strip()
-                
-    def build_get_entity_query(self, qid: str, language: str = "en") -> str:
-        """
-        Build a SPARQL query to get all properties and values for a given Wikidata item.
-
-        Args:
-            qid: Wikidata item id, e.g. "Q50602" (Manchester City F.C.)
-        
-        returns:
-            A SPARQL query string.
-        """
-        team_qid = self._ensure_qid(qid)
-
-        return f"""
-        PREFIX wd: <http://www.wikidata.org/entity/>
-        PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-        PREFIX wikibase: <http://wikiba.se/ontology#>
-        PREFIX bd: <http://www.bigdata.com/rdf#>
-
-        SELECT ?property ?propertyLabel ?value ?valueLabel WHERE {{
-        wd:{team_qid} ?wdtProp ?value .
-        FILTER(STRSTARTS(STR(?wdtProp), STR(wdt:)))
-        ?property wikibase:directClaim ?wdtProp .
-        SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language}". }}
-        }}
-        ORDER BY ?property ?value
-        """.strip()
-            
-            
     
-    async def get_coach_of_team(self, team, year:int = None, language="en") -> dict | None:
-        # 1) Find the team Q-id
-        team_candidates = await self.search_entity(team, limit=1)
-        if not team_candidates:
-            self.logger.error(f"Could not find the item {team}")
+                    
+    async def get_coach_of_team(self, entity_text:str=None, property_text:str="head coach", year:int = None, language="en") -> tuple[dict, dict] | None:
+        """
+        Get the coach of a football team for a given year.
+        Args:
+            entity_text: str - The name of the football team.
+            property_text: str - The property to query (default "head coach").
+            year: int - The year to filter by. If None, uses the current year.
+            language: str - Language code for labels (default "en").
+        Returns:
+            tuple[dict, dict] | None - A tuple of (entity_data, wiki_answer) if found, otherwise None.
+        """
+        try:
+            if entity_text and property_text:
+                await self.search_entity_and_property(
+                    entity_text=entity_text,
+                    property_text=property_text,
+                    language=language
+                )
+            
+            # 3) Query WDQS
+            query = self.build_query(qid=self._qid, pid=self._pid, year=year, language=language)
+            data = await self.wdqs_post(query)
+
+            bindings = data["results"]["bindings"]
+            if not bindings:
+                self.logger.warning(f"No results found for team Q-id '{self._qid}' and property P-id '{self._pid}' for year '{year}'")
+                return None
+
+            row = bindings[0]
+            #print(f'row: {row}')
+            who_qid = row["value"]["value"].split("entity/")[-1]
+            entity_data = await self.bio_fetcher.fetch_person_data_for_bio(who_qid, language=language)            
+            return entity_data, row
+        except Exception:
+            self.logger.error(f"Error getting coach of team: {traceback.format_exc()}")
             return None
-        print(f'Team candidates: {[(c["id"], c.get("label"), c.get("description")) for c in team_candidates]}')
-        qid = team_candidates[0]["id"] if team_candidates else None
-
-        # 2) Find the coach property P-id
-        what = "coach"
-        prop_candidates = await self.search_property(what, limit=1)
-        pid = prop_candidates[0]["id"] if prop_candidates else None
-        if not prop_candidates:
-            self.logger.error(f"Could not find the property {what}")
-            return None
-        print(f'Property candidates: {[(c["id"], c.get("label"), c.get("description")) for c in prop_candidates]}')
-
-        # 3) Query WDQS
-        query = self.build_query(qid=qid, pid=pid, year=year, language=language)
-        data = await self.wdqs_post(query)
-
-        bindings = data["results"]["bindings"]
-        if not bindings:
-            return None
-
-        row = bindings[0]
-        print(f'row: {row}')
-        who_qid = row["value"]["value"].split("/")[-1]
-        get_entity_query = self.build_get_entity_query(qid=who_qid, language=language)
-        entity_data = await self.wdqs_post(get_entity_query)
-        print(f'Entity data: {entity_data}')
 
         
         
     
 async def main():
-    client = WikidataClient(user_agent="MyWikidataClient/1.0 (contact: you@example.com)")
-    result = await client.get_coach_of_team()
+    client = WikidataClient(user_agent="MyWikidataClient/1.0 (contact: jovial@test.com)")
+    result = await client.get_coach_of_team("Hertha BSC", year=2021)
     
-    print("Coach of Manchester City this year:", result)
+    #print("Coach of Manchester City this year:", result)
         
 
 #import asyncio            
