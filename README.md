@@ -46,6 +46,9 @@ This will start the following services (via Docker Compose):
 **Frontend** (web UI)
 **Nginx proxy** (public entrypoint)
 
+- **Note**: The starting process takes some time since ot automatically download the needed ollama model
+- Wait until the message "INFO: Application startup complete"
+
 ### 2)  Open the frontend
 Open your browser and go to:
 
