@@ -183,14 +183,15 @@ We will need a vector database for easily index our PDF's files contents
 
 ## 4) Potential for agents: where and how?
 Yes—agents can add value in this process. 
-potentials agent:
 
-- **Entity disambiguation agent**
+Potentials agent:
+
+- **Entity disambiguation agent**:
 If a city maps to multiple clubs (e.g., Berlin, Hamburg) or is uncertain, the agent can ask a clarification question.
 If the club name is not written as it is known, the agent can return the correct club's name (e.g., Union Berlin --> 1. FC Union Berlin)
-- **Prompt safety agent**
+- **Prompt safety agent**:
 Strip instructions from retrieved text, keep only factual evidence, ensure system rules aren’t overridden.
 - **Question-Answering agent**:
 Provide answers based on the retrieved context and user query.
-- **Self-evaluation agent**
+- **Self-evaluation agent**:
 After producing an answer, verify that it is relevant to the user question; otherwise regenerate or respond with uncertainty.
